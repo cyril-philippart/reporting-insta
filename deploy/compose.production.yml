@@ -1,3 +1,5 @@
+name: cynes-reporting
+
 services:
   app:
     image: ${APP_IMAGE}:${IMAGE_TAG:-latest}
