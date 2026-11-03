@@ -95,14 +95,14 @@ jobs:
           cd "$app_dir/deploy"
           test -f .env.production
           export IMAGE_TAG
-          docker compose --env-file .env.production -f compose.production.yml pull app
-          docker compose --env-file .env.production -f compose.production.yml up -d --remove-orphans app
+          docker compose --env-file .env.production -f compose.production.yml pull reporting
+          docker compose --env-file .env.production -f compose.production.yml up -d --remove-orphans reporting
           for attempt in $(seq 1 20); do
-            if docker compose --env-file .env.production -f compose.production.yml exec -T app node -e "fetch('http://127.0.0.1:3000/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"; then
+            if docker compose --env-file .env.production -f compose.production.yml exec -T reporting node -e "fetch('http://127.0.0.1:3000/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"; then
               break
             fi
             if [ "$attempt" -eq 20 ]; then
-              docker compose --env-file .env.production -f compose.production.yml logs --tail=100 app
+              docker compose --env-file .env.production -f compose.production.yml logs --tail=100 reporting
               exit 1
             fi
             sleep 3

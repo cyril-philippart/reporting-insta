@@ -1,7 +1,7 @@
 name: cynes-reporting
 
 services:
-  app:
+  reporting:
     image: ${APP_IMAGE}:${IMAGE_TAG:-latest}
     restart: unless-stopped
     env_file:
