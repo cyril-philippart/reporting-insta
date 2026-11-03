@@ -1,0 +1,29 @@
+services:
+  app:
+    image: ${APP_IMAGE}:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    env_file:
+      - .env.production
+    environment:
+      NODE_ENV: production
+      TZ: ${TZ:-Europe/Paris}
+    volumes:
+      - reporting_data:/app/data
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 25s
+    networks:
+      proxy:
+        aliases:
+          - cynes-reporting
+
+volumes:
+  reporting_data:
+
+networks:
+  proxy:
+    external: true
+    name: ${PROXY_NETWORK:-deploy_frontend}
