@@ -26,7 +26,7 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 COPY --from=dependencies /app/node_modules/playwright ./node_modules/playwright
 COPY --from=dependencies /app/node_modules/playwright-core ./node_modules/playwright-core
-RUN npx playwright install --with-deps chromium \
+RUN node node_modules/playwright/cli.js install --with-deps chromium \
     && chown -R nextjs:nodejs /ms-playwright
 USER nextjs
 EXPOSE 3000
