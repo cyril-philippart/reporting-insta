@@ -2,6 +2,8 @@
 
 Dashboard interne de reporting Instagram affichant simultanément les vues, la couverture, les interactions, les nouveaux followers, les visites et les clics sur un lien.
 
+L’historique des versions est disponible dans le [changelog](./CHANGELOG.md).
+
 Le rapport inclut également les trois publications, carrousels ou Reels publiés dans la période qui totalisent actuellement le plus de vues.
 
 ## Configuration
