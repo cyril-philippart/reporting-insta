@@ -57,6 +57,7 @@ export function Dashboard() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [pdfLoading, setPdfLoading] = useState(false);
+  const [pdfPreviewUrl, setPdfPreviewUrl] = useState("");
   const [analysis, setAnalysis] = useState("");
   const [analysisLoading, setAnalysisLoading] = useState(false);
   const [emailOpen, setEmailOpen] = useState(false);
@@ -76,6 +77,49 @@ export function Dashboard() {
   const [adminOpen, setAdminOpen] = useState(false);
   const [accountLoading, setAccountLoading] = useState(false);
   const [adminError, setAdminError] = useState("");
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      try {
+        const cached = localStorage.getItem("cynes-reporting:last-report");
+        if (!cached) return;
+        const saved = JSON.parse(cached) as {
+          report?: ReportData;
+          analysis?: string;
+        };
+        if (
+          !saved.report?.account?.id ||
+          !saved.report.period?.start ||
+          !saved.report.period?.end
+        )
+          return;
+        setReport(saved.report);
+        setAnalysis(saved.analysis ?? "");
+        setStart(saved.report.period.start);
+        setEnd(saved.report.period.end);
+        setAccountId(saved.report.account.id);
+      } catch {
+        localStorage.removeItem("cynes-reporting:last-report");
+      }
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+  useEffect(() => {
+    if (!report) return;
+    try {
+      localStorage.setItem(
+        "cynes-reporting:last-report",
+        JSON.stringify({ report, analysis }),
+      );
+    } catch {
+      /* The report still works without browser persistence. */
+    }
+  }, [report, analysis]);
+  useEffect(
+    () => () => {
+      if (pdfPreviewUrl) URL.revokeObjectURL(pdfPreviewUrl);
+    },
+    [pdfPreviewUrl],
+  );
   async function refreshAccounts() {
     const r = await fetch("/api/accounts");
     if (r.status === 401) {
@@ -96,7 +140,7 @@ export function Dashboard() {
           return;
         }
         setAccounts(data);
-        setAccountId(data[0]?.id || "");
+        setAccountId((current) => current || data[0]?.id || "");
         setAuthenticated(true);
       });
   }, []);
@@ -195,22 +239,27 @@ export function Dashboard() {
     }
   }
 
+  async function createPdfBlob() {
+    if (!report) throw new Error("Aucun rapport chargé.");
+    const reportAnalysis = analysis || (await generateAnalysis());
+    const response = await fetch("/api/report/pdf", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ report, analysis: reportAnalysis }),
+    });
+    if (!response.ok) {
+      const payload = await response.json();
+      throw new Error(payload.error ?? "Impossible de générer le PDF.");
+    }
+    return response.blob();
+  }
+
   async function download() {
     if (!report) return;
     setPdfLoading(true);
     setError("");
     try {
-      const reportAnalysis = analysis || (await generateAnalysis());
-      const response = await fetch("/api/report/pdf", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ report, analysis: reportAnalysis }),
-      });
-      if (!response.ok) {
-        const payload = await response.json();
-        throw new Error(payload.error ?? "Impossible de générer le PDF.");
-      }
-      const url = URL.createObjectURL(await response.blob());
+      const url = URL.createObjectURL(await createPdfBlob());
       const link = document.createElement("a");
       link.href = url;
       link.download = `cynes-instagram-${start}-${end}.pdf`;
@@ -221,6 +270,27 @@ export function Dashboard() {
         reason instanceof Error
           ? reason.message
           : "Une erreur inattendue est survenue.",
+      );
+    } finally {
+      setPdfLoading(false);
+    }
+  }
+
+  async function previewPdf() {
+    if (!report) return;
+    setPdfLoading(true);
+    setError("");
+    try {
+      const url = URL.createObjectURL(await createPdfBlob());
+      setPdfPreviewUrl((current) => {
+        if (current) URL.revokeObjectURL(current);
+        return url;
+      });
+    } catch (reason) {
+      setError(
+        reason instanceof Error
+          ? reason.message
+          : "Impossible de générer l’aperçu.",
       );
     } finally {
       setPdfLoading(false);
@@ -356,6 +426,12 @@ export function Dashboard() {
               if (!emailLoading) setEmailOpen(false);
             }}
             onSubmit={sendEmail}
+          />
+        )}
+        {pdfPreviewUrl && (
+          <PdfPreviewDialog
+            url={pdfPreviewUrl}
+            onClose={() => setPdfPreviewUrl("")}
           />
         )}
         {adminOpen && (
@@ -540,6 +616,18 @@ export function Dashboard() {
           <>
             <div className="mt-8 flex flex-wrap justify-end gap-3">
               <button
+                onClick={previewPdf}
+                disabled={pdfLoading}
+                className="flex h-10 items-center justify-center gap-2 bg-[#172033] px-4 text-sm font-semibold text-white hover:bg-[#273550] disabled:opacity-60"
+              >
+                {pdfLoading ? (
+                  <LoaderCircle size={17} className="animate-spin" />
+                ) : (
+                  <Eye size={17} />
+                )}{" "}
+                Aperçu du PDF
+              </button>
+              <button
                 onClick={openEmailDialog}
                 className="flex h-10 items-center justify-center gap-2 border border-[#bfc7d1] bg-white px-4 text-sm font-semibold hover:bg-[#f5f7f9]"
               >
@@ -618,6 +706,47 @@ export function Dashboard() {
         )}
       </div>
     </main>
+  );
+}
+
+function PdfPreviewDialog({
+  url,
+  onClose,
+}: {
+  url: string;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    const close = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", close);
+    return () => document.removeEventListener("keydown", close);
+  }, [onClose]);
+  return (
+    <div className="fixed inset-0 z-[60] flex flex-col bg-[#172033]/85 p-3 sm:p-6">
+      <div className="mx-auto flex w-full max-w-[1100px] items-center justify-between bg-white px-4 py-3">
+        <div>
+          <b className="text-sm">Aperçu du rapport PDF</b>
+          <p className="text-xs text-[#687386]">
+            Le document n’est pas téléchargé.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Fermer l’aperçu"
+          className="grid size-9 place-items-center text-[#536074] hover:bg-[#f1f3f5]"
+        >
+          <X size={19} />
+        </button>
+      </div>
+      <iframe
+        src={url}
+        title="Aperçu du rapport PDF"
+        className="mx-auto min-h-0 w-full max-w-[1100px] flex-1 border-0 bg-white"
+      />
+    </div>
   );
 }
 
