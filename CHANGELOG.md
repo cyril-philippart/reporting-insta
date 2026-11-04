@@ -12,6 +12,8 @@ Le format s’inspire de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/
 
 ### Fixed
 
+- Mise à niveau de sécurité de Next.js 16.4.0 vers 16.4.5.
+
 ## [0.2.0] - 2026-11-04
 
 ### Added
