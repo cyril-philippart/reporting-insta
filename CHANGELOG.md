@@ -10,6 +10,8 @@ Le format s’inspire de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/
 
 ### Changed
 
+- Le formulaire d’envoi par e-mail laisse place à une confirmation visuelle après un envoi réussi.
+
 ### Fixed
 
 - Mise à niveau de sécurité de Next.js 16.4.0 vers 16.4.5.

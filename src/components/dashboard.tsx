@@ -891,6 +891,8 @@ function EmailDialog({
   onClose: () => void;
   onSubmit: (event: React.FormEvent) => void;
 }) {
+  const sent = status === "Rapport envoyé avec succès.";
+
   return (
     <div
       className="fixed inset-0 z-50 grid place-items-center bg-[#172033]/40 p-4"
@@ -904,6 +906,33 @@ function EmailDialog({
         aria-modal="true"
         className="w-full max-w-xl rounded-[6px] border border-[#dfe3e8] bg-white shadow-2xl"
       >
+        {sent ? (
+          <div className="relative flex min-h-80 flex-col items-center justify-center px-8 py-12 text-center">
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Fermer"
+              className="absolute right-4 top-4 grid size-8 place-items-center text-[#687386] hover:bg-[#f1f3f5]"
+            >
+              <X size={18} />
+            </button>
+            <div className="grid size-16 place-items-center rounded-full bg-[#eaf8f1] text-[#16835b]">
+              <Check size={34} strokeWidth={2.5} />
+            </div>
+            <h2 className="mt-5 text-xl font-bold">Rapport envoyé</h2>
+            <p className="mt-2 max-w-sm text-sm leading-6 text-[#687386]">
+              L’e-mail et le rapport PDF ont bien été envoyés à {recipient}.
+            </p>
+            <button
+              type="button"
+              onClick={onClose}
+              className="mt-7 h-10 bg-[#172033] px-6 text-sm font-semibold text-white hover:bg-[#273550]"
+            >
+              Fermer
+            </button>
+          </div>
+        ) : (
+          <>
         <div className="flex items-start justify-between border-b border-[#e5e9ef] p-5">
           <div className="flex gap-3">
             <div className="grid size-10 place-items-center rounded-full bg-[#eef5fa] text-[#238bd0]">
@@ -960,7 +989,7 @@ function EmailDialog({
           </label>
           {status && (
             <div
-              className={`border px-4 py-3 text-sm ${status.includes("succès") ? "border-[#b9ddcc] bg-[#f2fbf6] text-[#176b48]" : "border-[#efc6c8] bg-[#fff7f7] text-[#a82c35]"}`}
+              className="border border-[#efc6c8] bg-[#fff7f7] px-4 py-3 text-sm text-[#a82c35]"
             >
               {status}
             </div>
@@ -987,6 +1016,8 @@ function EmailDialog({
             {loading ? "Envoi…" : "Envoyer"}
           </button>
         </div>
+          </>
+        )}
       </form>
     </div>
   );
