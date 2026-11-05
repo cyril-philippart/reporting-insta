@@ -41,6 +41,16 @@ import { ViewsChart } from "./views-chart";
 
 const number = new Intl.NumberFormat("fr-FR");
 const iso = (date: Date) => date.toISOString().slice(0, 10);
+
+function emailPeriodLabel(date: string) {
+  const month = new Intl.DateTimeFormat("fr-FR", {
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(`${date}T12:00:00Z`));
+  return /^[aeiouyh]/i.test(month) ? `d’${month}` : `de ${month}`;
+}
+
 type ManagedAccount = {
   id: string;
   username: string;
@@ -65,7 +75,7 @@ export function Dashboard() {
   const [emailRecipient, setEmailRecipient] = useState("");
   const [emailSubject, setEmailSubject] = useState("");
   const [emailMessage, setEmailMessage] = useState(
-    "Bonjour,\n\nVeuillez trouver ci-joint votre rapport de performances Instagram.\n\nBien cordialement,",
+    "Bonjour,\n\nVeuillez trouver ci-joint votre rapport de performances Instagram.\n\nBien cordialement,\nL’équipe CYNES",
   );
   const [emailStatus, setEmailStatus] = useState("");
   const [accounts, setAccounts] = useState<ManagedAccount[]>([]);
@@ -305,6 +315,9 @@ export function Dashboard() {
     setEmailSubject(
       `Rapport Instagram @${report.account.username} - ${formatPeriodLabel(report.period.start, report.period.end)}`,
     );
+    setEmailMessage(
+      `Bonjour,\n\nVeuillez trouver ci-joint votre rapport de performances Instagram pour le mois ${emailPeriodLabel(report.period.end)}.\n\nBien cordialement,\nL’équipe CYNES`,
+    );
     setEmailStatus("");
     setEmailOpen(true);
   }
@@ -331,8 +344,11 @@ export function Dashboard() {
       const payload = await response.json();
       if (!response.ok)
         throw new Error(payload.error ?? "Impossible d’envoyer le rapport.");
-      setEmailStatus("Rapport envoyé avec succès.");
-      setEmailRecipient("");
+      setEmailStatus(
+        payload.simulated
+          ? "Envoi simulé avec succès."
+          : "Rapport envoyé avec succès.",
+      );
     } catch (reason) {
       setEmailStatus(
         reason instanceof Error
@@ -891,7 +907,8 @@ function EmailDialog({
   onClose: () => void;
   onSubmit: (event: React.FormEvent) => void;
 }) {
-  const sent = status === "Rapport envoyé avec succès.";
+  const simulated = status === "Envoi simulé avec succès.";
+  const sent = simulated || status === "Rapport envoyé avec succès.";
 
   return (
     <div
@@ -919,9 +936,13 @@ function EmailDialog({
             <div className="grid size-16 place-items-center rounded-full bg-[#eaf8f1] text-[#16835b]">
               <Check size={34} strokeWidth={2.5} />
             </div>
-            <h2 className="mt-5 text-xl font-bold">Rapport envoyé</h2>
+            <h2 className="mt-5 text-xl font-bold">
+              {simulated ? "Envoi simulé" : "Rapport envoyé"}
+            </h2>
             <p className="mt-2 max-w-sm text-sm leading-6 text-[#687386]">
-              L’e-mail et le rapport PDF ont bien été envoyés à {recipient}.
+              {simulated
+                ? `Le parcours fonctionne correctement. Aucun e-mail réel n’a été envoyé à ${recipient}.`
+                : `L’e-mail et le rapport PDF ont bien été envoyés à ${recipient}.`}
             </p>
             <button
               type="button"

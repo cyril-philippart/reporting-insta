@@ -8,9 +8,14 @@ Le format s’inspire de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/
 
 ### Added
 
+- Mode de simulation locale pour tester le parcours d’envoi sans expédier d’e-mail.
+- Copie interne invisible envoyée séparément avec un objet dédié.
+
 ### Changed
 
 - Le formulaire d’envoi par e-mail laisse place à une confirmation visuelle après un envoi réussi.
+- Le message par défaut mentionne le mois du rapport et intègre la signature de l’équipe CYNES.
+- La mention technique du compte et des dates ISO a été retirée du corps de l’e-mail.
 
 ### Fixed
 

@@ -5,6 +5,10 @@ import { generateReportPdf, isReportData } from "@/lib/pdf/generate";
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+function isEmailSimulationEnabled() {
+  return process.env.NODE_ENV !== "production" && process.env.EMAIL_SIMULATION === "true";
+}
+
 function smtpConfiguration() {
   const host = process.env.SMTP_HOST;
   const user = process.env.SMTP_USER;
@@ -25,6 +29,16 @@ function escapeHtml(value: string) {
   return value.replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" })[character] ?? character);
 }
 
+function defaultEmailMessage(periodEnd: string) {
+  const month = new Intl.DateTimeFormat("fr-FR", {
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(`${periodEnd}T12:00:00Z`));
+  const period = /^[aeiouyh]/i.test(month) ? `d’${month}` : `de ${month}`;
+  return `Bonjour,\n\nVeuillez trouver ci-joint votre rapport de performances Instagram pour le mois ${period}.\n\nBien cordialement,\nL’équipe CYNES`;
+}
+
 export async function POST(request: Request) {
   if (!await isAuthenticated()) return NextResponse.json({ error: "Non autorisé." }, { status: 401 });
   try {
@@ -37,24 +51,41 @@ export async function POST(request: Request) {
     if (!isReportData(report)) return NextResponse.json({ error: "Données de rapport invalides." }, { status: 400 });
     if (!emailPattern.test(recipient)) return NextResponse.json({ error: "Adresse e-mail destinataire invalide." }, { status: 400 });
     if (!subject) return NextResponse.json({ error: "L’objet du message est obligatoire." }, { status: 400 });
+    if (isEmailSimulationEnabled()) {
+      return NextResponse.json({ success: true, simulated: true });
+    }
     const smtp = smtpConfiguration();
     if (!smtp) return NextResponse.json({ error: "L’envoi d’e-mails n’est pas encore configuré sur le serveur." }, { status: 503 });
 
     const pdf = await generateReportPdf(report, analysis);
-    const safeMessage = escapeHtml(message || "Veuillez trouver ci-joint votre rapport de performances Instagram.").replace(/\n/g, "<br>");
+    const emailMessage = message || defaultEmailMessage(report.period.end);
+    const safeMessage = escapeHtml(emailMessage).replace(/\n/g, "<br>");
     const transporter = nodemailer.createTransport(smtp);
+    const attachment = {
+      filename: `cynes-instagram-${report.period.start}-${report.period.end}.pdf`,
+      content: pdf,
+      contentType: "application/pdf" as const,
+    };
+    const emailContent = {
+      text: emailMessage,
+      html: `<div style="font-family:Arial,sans-serif;color:#172033;line-height:1.6"><p>${safeMessage}</p></div>`,
+      attachments: [attachment],
+    };
     await transporter.sendMail({
       from: smtp.from,
       to: recipient,
       subject,
-      text: message || "Veuillez trouver ci-joint votre rapport de performances Instagram.",
-      html: `<div style="font-family:Arial,sans-serif;color:#172033;line-height:1.6"><p>${safeMessage}</p><p style="color:#687386;font-size:13px">Rapport pour @${escapeHtml(report.account.username)} · ${escapeHtml(report.period.start)} au ${escapeHtml(report.period.end)}</p></div>`,
-      attachments: [{
-        filename: `cynes-instagram-${report.period.start}-${report.period.end}.pdf`,
-        content: pdf,
-        contentType: "application/pdf",
-      }],
+      ...emailContent,
     });
+    const internalCopyRecipient = process.env.REPORT_EMAIL_BCC?.trim();
+    if (internalCopyRecipient) {
+      await transporter.sendMail({
+        from: smtp.from,
+        to: internalCopyRecipient,
+        subject: `COPIE INTERNE - ${subject}`,
+        ...emailContent,
+      });
+    }
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Report email delivery failed", error instanceof Error ? error.message : "Unknown error");
